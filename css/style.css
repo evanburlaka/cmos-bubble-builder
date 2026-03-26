@@ -1,0 +1,316 @@
+/* 
+  Global styles for CMOS Bubble Builder
+
+  - Defines color system and typography
+  - Layout structure (header, sidebar, main grid)
+  - UI components (cards, inputs, tabs, diagrams)
+  - Designed for readability in an educational setting
+*/
+
+:root {
+  --bg: #f7f5ef;
+  --panel: #ffffff;
+  --panel-alt: #f2efe7;
+  --line: #c9c1b2;
+  --line-strong: #a99f8d;
+  --text: #1f1f1f;
+  --text-muted: #5d5a52;
+  --text-soft: #7a756a;
+  --blue: #2159c9;
+  --blue-soft: #dce7ff;
+  --green: #178042;
+  --red: #c62828;
+  --amber: #b96b00;
+  --amber-soft: #f7ead5;
+  --warn: #8a4d00;
+  --pmos-col: #2159c9;
+  --nmos-col: #c62828;
+  --pmos-lt: #dce7ff;
+  --nmos-lt: #f7d8d8;
+  --vdd-col: #178042;
+  --gnd-col: #7c3aed;
+  --out-col: #b96b00;
+  --font-sans: Arial, Helvetica, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.app { min-height: 100vh; }
+
+.header {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.header-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 22px 28px 18px;
+}
+.header-kicker {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-soft);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.site-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.header-sub {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.main {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px 28px 40px;
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.sidebar { min-width: 0; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.card-label {
+  margin: 0 0 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-soft);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.card-title {
+  margin: 0 0 14px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.expr-input {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  padding: 10px 12px;
+  outline: none;
+  margin-bottom: 10px;
+}
+.expr-input:focus {
+  border-color: var(--blue);
+}
+.expr-input::placeholder { color: var(--text-soft); }
+
+.btn-primary {
+  width: 100%;
+  border: 1px solid #1d1d1d;
+  background: #1d1d1d;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
+  cursor: pointer;
+  margin-bottom: 16px;
+}
+.btn-primary:hover {
+  background: #2a2a2a;
+}
+
+.syntax-guide,
+.meta-item,
+.normalized-expr,
+.error-box,
+.warn-item {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.syntax-guide {
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  padding: 12px;
+  margin-bottom: 16px;
+}
+.syntax-title,
+.examples-label,
+.meta-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-soft);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.syntax-title { margin-bottom: 8px; }
+.syntax-grid {
+  display: grid;
+  grid-template-columns: 78px 1fr;
+  gap: 4px 10px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.token {
+  font-family: var(--font-mono);
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.examples-label { margin-bottom: 8px; }
+.chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.chip:hover {
+  background: var(--panel-alt);
+  border-color: var(--text-soft);
+}
+
+.error-box {
+  border: 1px solid #d7b0b0;
+  background: #fbefef;
+  color: #8a2020;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  margin-top: 10px;
+}
+
+.normalized-expr {
+  border: 1px solid var(--line);
+  background: #f2efe7;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  word-break: break-all;
+}
+.parse-meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.meta-item {
+  border: 1px solid var(--line);
+  background: var(--panel-alt);
+  padding: 8px 10px;
+}
+.meta-label { margin-bottom: 2px; }
+.meta-value {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+.parse-note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.output-area {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  min-height: 500px;
+}
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel-alt);
+}
+.tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-right: 1px solid var(--line);
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 13px 16px;
+  cursor: pointer;
+}
+.tab:last-child { border-right: none; }
+.tab:hover { background: #ece8df; color: var(--text); }
+.tab.active {
+  background: var(--panel);
+  color: var(--text);
+}
+.tab-panel { display: none; padding: 18px 22px 28px; }
+.tab-panel.active { display: block; }
+
+.diagram-note {
+  margin: 0 0 14px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+.diagram-canvas {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 340px;
+  overflow: hidden;
+  padding: 4px 0;
+}
+.diagram-canvas svg { display: block; }
+
+.warnings-area { margin-top: 14px; }
+.warn-item {
+  border: 1px solid #d8c39b;
+  background: var(--amber-soft);
+  color: var(--warn);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 9px 12px;
+  margin-top: 8px;
+}
+
+.hidden { display: none !important; }
+
+.footer {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 14px 28px 26px;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-soft);
+}
+
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; }
+  .parse-meta { grid-template-columns: 1fr; }
+}

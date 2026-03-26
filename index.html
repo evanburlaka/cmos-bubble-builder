@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  CMOS Bubble Builder
+
+  Educational tool for visualizing Boolean expressions as CMOS transistor networks.
+  Converts expressions into both bubble diagrams and transistor-level schematics.
+
+  Designed for clarity and structural accuracy in CMOS logic design.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CMOS Bubble Builder</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <div class="header-inner">
+        <p class="header-kicker">CPE 151 - CMOS and Digital VLSI Design</p>
+        <h1 class="site-title">CMOS Bubble Builder</h1>
+        <p class="header-sub">Translate Boolean logic into CMOS bubble diagrams and transistor-level schematics.</p>
+      </div>
+    </header>
+
+    <main class="main">
+
+      <!-- LEFT SIDEBAR -->
+      <aside class="sidebar">
+
+        <!-- 01: Input -->
+        <section class="card">
+          <div class="card-label">01 - INPUT</div>
+          <h2 class="card-title">Boolean Expression</h2>
+
+          <input
+            type="text"
+            id="expr-input"
+            class="expr-input"
+            placeholder="e.g.  ~(A &amp; B)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button id="parse-btn" class="btn-primary">Generate</button>
+
+          <div class="syntax-guide">
+            <div class="syntax-title">Syntax</div>
+            <div class="syntax-grid">
+              <span class="token">~A</span><span>NOT A</span>
+              <span class="token">A &amp; B</span><span>AND</span>
+              <span class="token">A | B</span><span>OR</span>
+              <span class="token">( )</span><span>group expressions</span>
+            </div>
+          </div>
+
+          <div class="examples-section">
+            <div class="examples-label">Try an example</div>
+            <div class="chips-grid">
+              <button class="chip" data-expr="~(A &amp; B)">~(A &amp; B)</button>
+              <button class="chip" data-expr="~(A | B)">~(A | B)</button>
+              <button class="chip" data-expr="~(A &amp; B &amp; C)">~(A&amp;B&amp;C)</button>
+              <button class="chip" data-expr="~(A | B | C)">~(A|B|C)</button>
+              <button class="chip" data-expr="~((A &amp; B) | C)">~((A&amp;B)|C)</button>
+              <button class="chip" data-expr="~(A &amp; (B | C))">~(A&amp;(B|C))</button>
+              <button class="chip" data-expr="~((A &amp; B) | (C &amp; D))">~((A&amp;B)|(C&amp;D))</button>
+              <button class="chip" data-expr="~((A | B) &amp; (C | D))">~((A|B)&amp;(C|D))</button>
+            </div>
+          </div>
+
+          <div id="error-box" class="error-box hidden"></div>
+        </section>
+
+        <!-- 02: Parse Result -->
+        <section id="section-parse" class="card hidden">
+          <div class="card-label">02 - PARSE RESULT</div>
+          <h2 class="card-title">Expression Info</h2>
+          <div id="normalized-expr" class="normalized-expr"></div>
+          <div class="parse-meta">
+            <div class="meta-item">
+              <div class="meta-label">Variables</div>
+              <div id="meta-vars" class="meta-value"></div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Transistors</div>
+              <div id="meta-count" class="meta-value"></div>
+            </div>
+            <div class="meta-item">
+              <div class="meta-label">Gate type</div>
+              <div id="meta-gate" class="meta-value"></div>
+            </div>
+          </div>
+          <p class="parse-note">Static CMOS gates are inherently <em>inverting</em>, so expressions must be wrapped with a top-level NOT (~).</p>
+        </section>
+
+      </aside>
+
+      <!-- RIGHT: Tabbed output -->
+      <div id="output-area" class="output-area hidden">
+        <div class="tabs">
+          <button class="tab active" data-tab="bubble">Bubble Diagram</button>
+          <button class="tab" data-tab="schematic">Transistor Schematic</button>
+        </div>
+
+        <div id="tab-bubble" class="tab-panel active">
+          <p class="diagram-note">Each gray bubble is one transistor. Stacked groups indicate series connections. Side-by-side groups indicate parallel connections.</p>
+          <div id="bubble-diagram" class="diagram-canvas"></div>
+          <div id="bubble-warnings" class="warnings-area"></div>
+        </div>
+
+        <div id="tab-schematic" class="tab-panel">
+          <p class="diagram-note">PMOS devices form the pull-up network above the output. NMOS devices form the pull-down network below the output.</p>
+          <div id="schematic-diagram" class="diagram-canvas"></div>
+          <div id="schematic-warnings" class="warnings-area"></div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="footer">CMOS Bubble Builder · © 2026 Evan Burlaka · CPE 151 - CMOS and Digital VLSI Design</footer>
+  </div>
+
+  <script src="js/parser.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/schematic.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

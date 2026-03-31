@@ -127,3 +127,64 @@ function collectVars(node) {
   walk(node);
   return [...vars].sort();
 }
+
+// Evaluates a Boolean AST for one specific input assignment.
+// Example:
+//   ast = expression for ~(A & B)
+//   values = { A: 1, B: 0 }
+//   returns 1
+function evaluateAst(node, values) {
+  switch (node.type) {
+    case 'VAR': {
+      const val = values[node.name];
+      if (val !== 0 && val !== 1) {
+        throw new Error(`Missing or invalid value for variable "${node.name}"`);
+      }
+      return val;
+    }
+
+    case 'NOT':
+      return evaluateAst(node.child, values) ? 0 : 1;
+
+    case 'AND':
+      return node.children.every(child => evaluateAst(child, values) === 1) ? 1 : 0;
+
+    case 'OR':
+      return node.children.some(child => evaluateAst(child, values) === 1) ? 1 : 0;
+
+    case 'GROUP':
+      return evaluateAst(node.child, values);
+
+    default:
+      throw new Error(`Unknown AST node type: ${node.type}`);
+  }
+}
+
+// Generates all truth table rows for a parsed Boolean expression.
+// Returns an object like:
+// {
+//   vars: ['A', 'B'],
+//   rows: [
+//     { inputs: { A: 0, B: 0 }, output: 1 },
+//     ...
+//   ]
+// }
+function generateTruthTableRows(ast) {
+  const vars = collectVars(ast);
+  const rows = [];
+  const totalRows = Math.pow(2, vars.length);
+
+  for (let i = 0; i < totalRows; i++) {
+    const inputs = {};
+
+    for (let j = 0; j < vars.length; j++) {
+      const bitIndex = vars.length - 1 - j;
+      inputs[vars[j]] = (i >> bitIndex) & 1;
+    }
+
+    const output = evaluateAst(ast, inputs);
+    rows.push({ inputs, output });
+  }
+
+  return { vars, rows };
+}

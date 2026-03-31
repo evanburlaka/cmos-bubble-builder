@@ -101,6 +101,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="bubble">Bubble Diagram</button>
           <button class="tab" data-tab="schematic">Transistor Schematic</button>
+          <button class="tab" data-tab="truth">Truth Table</button>
         </div>
 
         <div id="tab-bubble" class="tab-panel active">
@@ -113,6 +114,11 @@
           <p class="diagram-note">PMOS devices form the pull-up network above the output. NMOS devices form the pull-down network below the output.</p>
           <div id="schematic-diagram" class="diagram-canvas"></div>
           <div id="schematic-warnings" class="warnings-area"></div>
+        </div>
+
+        <div id="tab-truth" class="tab-panel">
+          <p class="diagram-note">Truth table for the entered Boolean expression.</p>
+          <div id="truth-table-wrap" class="truth-table-wrap"></div>
         </div>
       </div>
 

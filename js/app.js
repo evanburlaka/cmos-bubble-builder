@@ -24,6 +24,7 @@ const schDiv       = document.getElementById('schematic-diagram');
 const warnDiv      = document.getElementById('schematic-warnings');
 
 const bubbleWarnDiv = document.getElementById('bubble-warnings');
+const truthTableWrap = document.getElementById('truth-table-wrap');
 // ── Example chips ─────────────────────────────────────────────────────────────
 document.querySelectorAll('.chip').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -61,6 +62,15 @@ function run() {
   try { ast = parseExpression(raw); }
   catch (e) { showError('Parse error: ' + e.message); return; }
 
+  // Step 1b: Generate truth table data
+  let truthTable;
+  try {
+    truthTable = generateTruthTableRows(ast);
+  } catch (e) {
+    showError('Truth table error: ' + e.message);
+    return;
+  }
+
   // Step 2: Convert AST to CMOS pull-up / pull-down networks
   let nmosNet, pmosNet, vars, warnings;
   try { ({ nmosNet, pmosNet, vars, warnings } = buildCmosNetworks(ast)); }
@@ -87,6 +97,14 @@ function run() {
     schDiv.innerHTML = renderSchematic(pmosNet, nmosNet);
   } catch (e) {
     schDiv.innerHTML = errMsg('Schematic error: ' + e.message);
+    console.error(e);
+  }
+
+  // Step 5b: Render truth table
+  try {
+    truthTableWrap.innerHTML = renderTruthTable(truthTable);
+  } catch (e) {
+    truthTableWrap.innerHTML = errMsg('Truth table render error: ' + e.message);
     console.error(e);
   }
 
@@ -125,4 +143,32 @@ function show(el) { el.classList.remove('hidden'); }
 function hide(el) { el.classList.add('hidden'); }
 function errMsg(msg) {
   return `<span style="color:#dc2626;font-family:IBM Plex Mono,monospace;font-size:12px;padding:16px;display:block">${msg}</span>`;
+}
+function renderTruthTable(truthTable) {
+  if (!truthTable || !truthTable.vars || !truthTable.rows) {
+    return '<div class="truth-empty">No truth table data available.</div>';
+  }
+
+  const vars = truthTable.vars;
+  const rows = truthTable.rows;
+
+  const headerHtml =
+    vars.map(v => `<th>${v}</th>`).join('') +
+    `<th class="output-cell">Y (output)</th>`;
+
+  const rowsHtml = rows.map(row => {
+    const inputCells = vars.map(v => `<td>${row.inputs[v]}</td>`).join('');
+    return `<tr>${inputCells}<td class="output-cell">${row.output}</td></tr>`;
+  }).join('');
+
+  return `
+    <table class="truth-table">
+      <thead>
+        <tr>${headerHtml}</tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+  `;
 }

@@ -314,3 +314,41 @@ body {
   .main { grid-template-columns: 1fr; }
   .parse-meta { grid-template-columns: 1fr; }
 }
+
+.truth-table-wrap {
+  padding: 8px 0 0;
+  overflow-x: auto;
+}
+
+.truth-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: #fff;
+}
+
+.truth-table th,
+.truth-table td {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: center;
+}
+
+.truth-table th {
+  background: var(--panel-alt);
+  font-weight: 700;
+}
+
+.truth-table td.output-cell,
+.truth-table th.output-cell {
+  background: #f7ead5;
+  font-weight: 700;
+}
+
+.truth-empty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}

@@ -169,10 +169,21 @@ function evaluateAst(node, values) {
 //     ...
 //   ]
 // }
+const MAX_TRUTH_TABLE_VARS = 10;
 function generateTruthTableRows(ast) {
   const vars = collectVars(ast);
-  const rows = [];
   const totalRows = Math.pow(2, vars.length);
+
+  if (vars.length > MAX_TRUTH_TABLE_VARS) {
+    return {
+      vars,
+      rows: null,
+      tooLarge: true,
+      totalRows
+    };
+  }
+
+  const rows = [];
 
   for (let i = 0; i < totalRows; i++) {
     const inputs = {};

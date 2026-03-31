@@ -145,7 +145,20 @@ function errMsg(msg) {
   return `<span style="color:#dc2626;font-family:IBM Plex Mono,monospace;font-size:12px;padding:16px;display:block">${msg}</span>`;
 }
 function renderTruthTable(truthTable) {
-  if (!truthTable || !truthTable.vars || !truthTable.rows) {
+  if (!truthTable || !truthTable.vars) {
+    return '<div class="truth-empty">No truth table data available.</div>';
+  }
+
+  if (truthTable.tooLarge) {
+    return `
+      <div class="warn-item">
+        ⚠  Truth table not shown: this expression has ${truthTable.vars.length} variables
+        (${truthTable.totalRows.toLocaleString()} rows). Full truth table rendering is disabled for large inputs.
+      </div>
+    `;
+  }
+
+  if (!truthTable.rows) {
     return '<div class="truth-empty">No truth table data available.</div>';
   }
 

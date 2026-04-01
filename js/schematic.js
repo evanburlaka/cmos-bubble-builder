@@ -48,6 +48,9 @@ const S = {
   VDD:   '#2d3542',
   GND:   '#2d3542',
   OUT:   '#2d3542',
+  INV:   '#5b6b8a',
+  INV_WIRE: '#5b6b8a',
+  INV_FILL: '#eef2ff',
   WARN:  '#ea580c',
   FONT:  'IBM Plex Mono, monospace',
 };
@@ -401,17 +404,109 @@ function sigGnd(cx, y, col, font) {
   ].join('\n');
 }
 
+function blockRightX(ox, measuredNet) {
+  return ox + measuredNet.w;
+}
+
+function makeInverterNetworks(inputName = 'X') {
+  return {
+    pmosNet: { type: 'TRANSISTOR', var: inputName, inverted: false },
+    nmosNet: { type: 'TRANSISTOR', var: inputName, inverted: false }
+  };
+}
+
+function drawPmosTinted(ox, oy, label, spineOx, color) {
+  const parts  = [];
+  const spineX = ox + spineOx;
+
+  const gateBarX  = spineX - S.SD_STUB - S.BODY_GAP - 1;
+  const midY      = oy + S.CELL_H / 2;
+  const halfH     = S.GATE_BAR_H / 2;
+  const srcY      = midY - halfH * 0.52;
+  const drnY      = midY + halfH * 0.52;
+
+  const bubbleCx     = gateBarX - S.BUBBLE_R - 1;
+  const gateWireEndX = bubbleCx - S.BUBBLE_R;
+  const gateContactX = gateWireEndX - S.GATE_WIRE;
+  const channelX     = gateBarX + S.BODY_GAP + 1;
+
+  parts.push(
+    `<line x1="${gateBarX}" y1="${midY - halfH}" x2="${gateBarX}" y2="${midY + halfH}"
+      stroke="${color}" stroke-width="3" stroke-linecap="round"/>`,
+    `<line x1="${gateBarX + S.BODY_GAP}" y1="${srcY}" x2="${spineX}" y2="${srcY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${gateBarX + S.BODY_GAP}" y1="${drnY}" x2="${spineX}" y2="${drnY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${gateContactX}" y1="${midY}" x2="${gateWireEndX}" y2="${midY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<circle cx="${bubbleCx}" cy="${midY}" r="${S.BUBBLE_R}"
+      fill="none" stroke="${color}" stroke-width="1.8"/>`,
+    `<text x="${gateContactX - 15}" y="${midY}" text-anchor="end"
+      dominant-baseline="central" font-family="${S.FONT}"
+      font-size="12" font-weight="600" fill="${color}">${label}</text>`,
+    `<line x1="${spineX}" y1="${oy}" x2="${spineX}" y2="${srcY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${channelX}" y1="${srcY}" x2="${channelX}" y2="${drnY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${spineX}" y1="${drnY}" x2="${spineX}" y2="${oy + S.CELL_H}"
+      stroke="${color}" stroke-width="2"/>`
+  );
+
+  return { parts, spineX, topY: oy, botY: oy + S.CELL_H };
+}
+
+function drawNmosTinted(ox, oy, label, spineOx, color) {
+  const parts  = [];
+  const spineX = ox + spineOx;
+
+  const gateBarX  = spineX - S.SD_STUB - S.BODY_GAP - 1;
+  const midY      = oy + S.CELL_H / 2;
+  const halfH     = S.GATE_BAR_H / 2;
+  const drnY      = midY - halfH * 0.52;
+  const srcY      = midY + halfH * 0.52;
+  const gateContactX = gateBarX - S.GATE_WIRE - 2;
+  const channelX     = gateBarX + S.BODY_GAP + 1;
+
+  parts.push(
+    `<line x1="${gateBarX}" y1="${midY - halfH}" x2="${gateBarX}" y2="${midY + halfH}"
+      stroke="${color}" stroke-width="3" stroke-linecap="round"/>`,
+    `<line x1="${gateBarX + S.BODY_GAP}" y1="${drnY}" x2="${spineX}" y2="${drnY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${gateBarX + S.BODY_GAP}" y1="${srcY}" x2="${spineX}" y2="${srcY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${gateContactX}" y1="${midY}" x2="${gateBarX - 1}" y2="${midY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<text x="${gateContactX - 25}" y="${midY}" text-anchor="end"
+      dominant-baseline="central" font-family="${S.FONT}"
+      font-size="12" font-weight="600" fill="${color}">${label}</text>`,
+    `<line x1="${spineX}" y1="${oy}" x2="${spineX}" y2="${drnY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${channelX}" y1="${drnY}" x2="${channelX}" y2="${srcY}"
+      stroke="${color}" stroke-width="2"/>`,
+    `<line x1="${spineX}" y1="${srcY}" x2="${spineX}" y2="${oy + S.CELL_H}"
+      stroke="${color}" stroke-width="2"/>`
+  );
+
+  return { parts, spineX, topY: oy, botY: oy + S.CELL_H };
+}
+
 // ─── Main entry builds full CMOS schematic including VDD, output node, and GND
-function renderSchematic(pmosNet, nmosNet) {
-  const MIN_LABEL_LEFT = 10;   // minimum left margin (must fit gate labels)
-  const Y_LABEL_RIGHT  = 80;   // right margin reserved for "Y" label
+function renderSchematic(pmosNet, nmosNet, options = {}) {
+  const needsOutputInverter = options.needsOutputInverter === true;
+  const SIDE_MARGIN = 28;
   const PAD_TOP        = 60;   // top padding for VDD symbol
   const OUT_GAP        = 32;   // vertical gap between PMOS botY and NMOS topY
   const OUT_R          =  5;
+  const INV_STAGE_GAP  = 56;
 
   // Pre-measure both networks
   const pm = measureNet(pmosNet);
   const nm = measureNet(nmosNet);
+
+  // Pre-measure optional output inverter stage
+  const invNetworks = needsOutputInverter ? makeInverterNetworks('X') : null;
+  const invPm = needsOutputInverter ? measureNet(invNetworks.pmosNet) : null;
+  const invNm = needsOutputInverter ? measureNet(invNetworks.nmosNet) : null;
 
   // Force both networks to share the same spineOx (left-pad the narrower one)
   const sharedSpineOx = Math.max(pm.spineOx, nm.spineOx);
@@ -440,9 +535,9 @@ function renderSchematic(pmosNet, nmosNet) {
   const targetSpineOx  = Math.max(contentW / 2, sharedSpineOx); // center, never less than current spine
   const rightPad       = targetSpineOx - sharedSpineOx;          // extra space added to right of networks
   const paddedContentW = contentW + rightPad;
-  const LABEL_LEFT     = MIN_LABEL_LEFT;
-  const svgW           = LABEL_LEFT + paddedContentW + Y_LABEL_RIGHT;
-  const spineX         = LABEL_LEFT + targetSpineOx;   // centered on paddedContentW
+  const LABEL_LEFT = SIDE_MARGIN;
+  const spineX = LABEL_LEFT + targetSpineOx;
+  let svgW = 0;
 
   // Y positions
   const vddSymY   = PAD_TOP - 36;
@@ -461,6 +556,27 @@ function renderSchematic(pmosNet, nmosNet) {
   // Each network is also left-padded to align its own spineOx with sharedSpineOx.
   const pmosOx = LABEL_LEFT + rightPad + (sharedSpineOx - pm.spineOx);
   const nmosOx = LABEL_LEFT + rightPad + (sharedSpineOx - nm.spineOx);
+  const coreRightX = Math.max(
+    blockRightX(pmosOx, pm),
+    blockRightX(nmosOx, nm)
+  );
+
+  const contentLeftX = Math.min(pmosOx, nmosOx, SIDE_MARGIN);
+
+  let contentRightX = coreRightX;
+
+  if (needsOutputInverter) {
+    const invBlockLeftX = coreRightX + INV_STAGE_GAP;
+    const invRightX = invBlockLeftX + Math.max(invPm.w, invNm.w) + 80; // extra room for Y label
+    contentRightX = Math.max(contentRightX, invRightX);
+  } else {
+    contentRightX = Math.max(contentRightX, spineX + 80); // room for Y label in single-stage case
+  }
+
+  const contentWidth = contentRightX - contentLeftX;
+  const desiredSvgW = contentWidth + SIDE_MARGIN * 2;
+  const shiftX = SIDE_MARGIN - contentLeftX;
+  svgW = desiredSvgW;
 
   const parts = [];
   parts.push(schGridDots(svgW, svgH));
@@ -519,16 +635,110 @@ function renderSchematic(pmosNet, nmosNet) {
   parts.push(`<line x1="${spineX}" y1="${pmosRes.botY}" x2="${spineX}" y2="${outY}"
     stroke="${S.WIRE}" stroke-width="2.5"/>`);
 
-  // ── Output node: T-junction (dot + horizontal branch right toward Y label) ──
-  // The dot sits on spineX (now at content center). Branch extends a fixed length rightward.
-  const yBranchEnd = spineX + 48;
-  parts.push(
-    `<circle cx="${spineX}" cy="${outY}" r="${OUT_R}" fill="${S.OUT}"/>`,
-    `<line x1="${spineX+OUT_R}" y1="${outY}" x2="${yBranchEnd}" y2="${outY}"
-      stroke="${S.OUT}" stroke-width="2"/>`,
-    `<text x="${yBranchEnd+5}" y="${outY}" text-anchor="start" dominant-baseline="central"
-      font-family="${S.FONT}" font-size="13" font-weight="700" fill="${S.OUT}">Y</text>`
-  );
+  if (!needsOutputInverter) {
+    const yBranchEnd = spineX + 48;
+    parts.push(
+      `<circle cx="${spineX}" cy="${outY}" r="${OUT_R}" fill="${S.OUT}"/>`,
+      `<line x1="${spineX+OUT_R}" y1="${outY}" x2="${yBranchEnd}" y2="${outY}"
+        stroke="${S.OUT}" stroke-width="2"/>`,
+      `<text x="${yBranchEnd+5}" y="${outY}" text-anchor="start" dominant-baseline="central"
+        font-family="${S.FONT}" font-size="13" font-weight="700" fill="${S.OUT}">Y</text>`
+    );
+  } else {
+
+    // X leaves the core output node and routes to the separate output inverter
+    const xWireStartX = spineX + OUT_R;
+    const xLabelX = spineX + 14;
+
+    // Place the inverter fully to the right of the actual core block
+    const invBlockLeftX = coreRightX + INV_STAGE_GAP;
+    const invSpineX = invBlockLeftX + CELL_SPINE_OX;
+
+    // Center the inverter around the same output Y-level
+    const invPmosOy = outY - S.CELL_H - 12;
+    const invNmosOy = outY + 12;
+
+    // Draw the output inverter in a distinct shade
+    const invPmosRes = drawPmosTinted(invBlockLeftX, invPmosOy, 'X', CELL_SPINE_OX, S.INV);
+    const invNmosRes = drawNmosTinted(invBlockLeftX, invNmosOy, 'X', CELL_SPINE_OX, S.INV);
+
+    parts.push(...invPmosRes.parts);
+    parts.push(...invNmosRes.parts);
+
+    // Continuous inverter output spine through Y
+    parts.push(
+      `<line x1="${invSpineX}" y1="${invPmosRes.botY}" x2="${invSpineX}" y2="${invNmosRes.topY}"
+        stroke="${S.INV}" stroke-width="2.5"/>`
+    );
+
+    // Compute actual gate connection points for the inverter
+    const gateBarX = invSpineX - S.SD_STUB - S.BODY_GAP - 1;
+    const pBubbleCx = gateBarX - S.BUBBLE_R - 1;
+    const pGateWireX = pBubbleCx - S.BUBBLE_R - S.GATE_WIRE;
+    const nGateWireX = gateBarX - S.GATE_WIRE - 2;
+
+    const pGateY = invPmosOy + S.CELL_H / 2;
+    const nGateY = invNmosOy + S.CELL_H / 2;
+
+    const xBusX = Math.min(pGateWireX, nGateWireX) - 8;
+
+    // X node at the core output
+    parts.push(
+      `<circle cx="${spineX}" cy="${outY}" r="${OUT_R}" fill="${S.OUT}"/>`,
+      `<line x1="${xWireStartX}" y1="${outY}" x2="${xBusX}" y2="${outY}"
+        stroke="${S.OUT}" stroke-width="2"/>`,
+      `<text x="${xLabelX+10}" y="${outY-4}" text-anchor="start"
+        font-family="${S.FONT}" font-size="13" font-weight="700" fill="${S.OUT}">X</text>`
+    );
+
+    // Feed X into both inverter gates with a tighter local branch
+    parts.push(
+      `<line x1="${xBusX}" y1="${outY}" x2="${xBusX}" y2="${pGateY}"
+        stroke="${S.INV_WIRE}" stroke-width="2"/>`,
+      `<line x1="${xBusX}" y1="${outY}" x2="${xBusX}" y2="${nGateY}"
+        stroke="${S.INV_WIRE}" stroke-width="2"/>`,
+      `<line x1="${xBusX}" y1="${pGateY}" x2="${pGateWireX}" y2="${pGateY}"
+        stroke="${S.INV_WIRE}" stroke-width="2"/>`,
+      `<line x1="${xBusX}" y1="${nGateY}" x2="${nGateWireX}" y2="${nGateY}"
+        stroke="${S.INV_WIRE}" stroke-width="2"/>`
+    );
+
+    // Local VDD symbol for the output inverter
+    const invVddTopY = vddLineY - 3;
+    parts.push(
+      `<text x="${invSpineX}" y="${invVddTopY - 16}" text-anchor="middle" dominant-baseline="hanging"
+        font-family="${S.FONT}" font-size="11" font-weight="700" fill="${S.INV}">VDD</text>`,
+      `<line x1="${invSpineX - 12}" y1="${invVddTopY}" x2="${invSpineX + 12}" y2="${invVddTopY}"
+        stroke="${S.INV}" stroke-width="3"/>`,
+      `<line x1="${invSpineX}" y1="${invVddTopY}" x2="${invSpineX}" y2="${invPmosRes.topY}"
+        stroke="${S.INV}" stroke-width="2"/>`
+    );
+
+    // Local GND symbol for the output inverter
+    const invGndY = gndSymY;
+    parts.push(
+      `<line x1="${invSpineX}" y1="${invNmosRes.botY}" x2="${invSpineX}" y2="${invGndY}"
+        stroke="${S.INV}" stroke-width="2"/>`,
+      `<line x1="${invSpineX - 14}" y1="${invGndY}" x2="${invSpineX + 14}" y2="${invGndY}"
+        stroke="${S.INV}" stroke-width="3"/>`,
+      `<line x1="${invSpineX - 14}" y1="${invGndY}" x2="${invSpineX}" y2="${invGndY + 16}"
+        stroke="${S.INV}" stroke-width="2"/>`,
+      `<line x1="${invSpineX + 14}" y1="${invGndY}" x2="${invSpineX}" y2="${invGndY + 16}"
+        stroke="${S.INV}" stroke-width="2"/>`,
+      `<text x="${invSpineX}" y="${invGndY + 22}" text-anchor="middle" dominant-baseline="hanging"
+        font-family="${S.FONT}" font-size="11" font-weight="700" fill="${S.INV}">GND / VSS</text>`
+    );
+
+    // Final Y comes from the inverter output, not the core node
+    const yBranchEnd = invSpineX + 48;
+    parts.push(
+      `<circle cx="${invSpineX}" cy="${outY}" r="${OUT_R}" fill="${S.OUT}"/>`,
+      `<line x1="${invSpineX+OUT_R}" y1="${outY}" x2="${yBranchEnd}" y2="${outY}"
+        stroke="${S.INV_WIRE}" stroke-width="2"/>`,
+      `<text x="${yBranchEnd+5}" y="${outY}" text-anchor="start" dominant-baseline="central"
+        font-family="${S.FONT}" font-size="13" font-weight="700" fill="${S.OUT}">Y</text>`
+    );
+  }
 
   // ── Continuous spine from output node to NMOS topY ──────────────────────
   parts.push(`<line x1="${spineX}" y1="${outY+OUT_R}" x2="${spineX}" y2="${nmosRes.topY}"
@@ -544,6 +754,8 @@ function renderSchematic(pmosNet, nmosNet) {
 
   return `<svg viewBox="0 0 ${svgW} ${svgH}" width="${svgW}" height="${svgH}"
     xmlns="http://www.w3.org/2000/svg" style="max-width:100%; height:auto">
-    ${parts.join('\n    ')}
+    <g transform="translate(${shiftX}, 0)">
+      ${parts.join('\n    ')}
+    </g>
   </svg>`;
 }

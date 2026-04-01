@@ -66,6 +66,10 @@
               <button class="chip" data-expr="~(A &amp; (B | C))">~(A&amp;(B|C))</button>
               <button class="chip" data-expr="~((A &amp; B) | (C &amp; D))">~((A&amp;B)|(C&amp;D))</button>
               <button class="chip" data-expr="~((A | B) &amp; (C | D))">~((A|B)&amp;(C|D))</button>
+              <button class="chip" data-expr="A">A</button>
+              <button class="chip" data-expr="(A &amp; B)">(A&amp;B)</button>
+              <button class="chip" data-expr="((A | B) &amp; (C | D))">((A|B)&amp;(C|D))</button>
+              <button class="chip" data-expr="((A &amp; B) | C)">((A&amp;B)|C)</button>
             </div>
           </div>
 
@@ -91,7 +95,7 @@
               <div id="meta-gate" class="meta-value"></div>
             </div>
           </div>
-          <p class="parse-note">Static CMOS gates are inherently <em>inverting</em>, so expressions must be wrapped with a top-level NOT (~).</p>
+          <p id="parse-note" class="parse-note"></p>
         </section>
 
       </aside>
@@ -103,6 +107,8 @@
           <button class="tab" data-tab="schematic">Transistor Schematic</button>
           <button class="tab" data-tab="truth">Truth Table</button>
         </div>
+
+        <div id="impl-alert" class="impl-alert hidden"></div>
 
         <div id="tab-bubble" class="tab-panel active">
           <p class="diagram-note">Each gray bubble is one transistor. Stacked groups indicate series connections. Side-by-side groups indicate parallel connections.</p>

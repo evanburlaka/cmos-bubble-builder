@@ -416,7 +416,8 @@ function buildLegend(nmos, pmos, cx, svgH) {
 }
 
 // ─── Main entry: generates full CMOS bubble diagram (PMOS + NMOS + wiring) ─────
-function renderBubbleDiagram(pmosNet, nmosNet) {
+function renderBubbleDiagram(pmosNet, nmosNet, options = {}) {
+  const needsOutputInverter = options.needsOutputInverter === true;
   // Assign matching color indices: PMOS child i ↔ NMOS child i → same color
   assignBothNetworks(nmosNet, pmosNet);
 
@@ -425,7 +426,8 @@ function renderBubbleDiagram(pmosNet, nmosNet) {
 
   const netW   = Math.max(pmosBox.w, nmosBox.w, 60);
   const ringW  = netW + RING_PAD * 2;
-  const svgW   = LABEL_W + ringW + RIGHT_PAD;
+  const extraInvW = needsOutputInverter ? 0 : 0;
+  const svgW   = LABEL_W + ringW + RIGHT_PAD + extraInvW;
   const netOx  = LABEL_W + RING_PAD;
   const diagCx = LABEL_W + ringW / 2;
 
@@ -521,16 +523,48 @@ function renderBubbleDiagram(pmosNet, nmosNet) {
       stroke="${C_WIRE}" stroke-width="${WIRE_W}"/>`
   );
 
-  // Output node
-  const yWireX = diagCx + OUT_R;
-  const yWireLen = 44;
-  parts.push(
-    `<circle cx="${diagCx}" cy="${outNodeY}" r="${OUT_R}" fill="${C_OUT}"/>`,
-    `<line x1="${yWireX}" y1="${outNodeY}" x2="${yWireX + yWireLen}" y2="${outNodeY}"
-      stroke="${C_OUT}" stroke-width="2"/>`,
-    `<text x="${yWireX + yWireLen + 6}" y="${outNodeY}" text-anchor="start" dominant-baseline="central"
-      font-family="${FONT}" font-size="12" font-weight="700" fill="${C_OUT}">Y (output)</text>`
-  );
+  // Output node(s)
+  const coreWireStartX = diagCx + OUT_R;
+
+  if (!needsOutputInverter) {
+    const yWireLen = 44;
+    parts.push(
+      `<circle cx="${diagCx}" cy="${outNodeY}" r="${OUT_R}" fill="${C_OUT}"/>`,
+      `<line x1="${coreWireStartX}" y1="${outNodeY}" x2="${coreWireStartX + yWireLen}" y2="${outNodeY}"
+        stroke="${C_OUT}" stroke-width="2"/>`,
+      `<text x="${coreWireStartX + yWireLen + 6}" y="${outNodeY}" text-anchor="start" dominant-baseline="central"
+        font-family="${FONT}" font-size="12" font-weight="700" fill="${C_OUT}">Y</text>`
+    );
+  } else {
+    const xTapLen = 26;
+    const invInX = coreWireStartX + xTapLen + 10;
+    const triW = 26;
+    const triH = 20;
+    const bubbleR = 4;
+    const invOutStartX = invInX + triW + bubbleR * 2 + 4;
+    const yWireLen = 34;
+
+    parts.push(
+      // X node
+      `<circle cx="${diagCx}" cy="${outNodeY}" r="${OUT_R}" fill="${C_OUT}"/>`,
+      `<line x1="${coreWireStartX}" y1="${outNodeY}" x2="${invInX}" y2="${outNodeY}"
+        stroke="${C_OUT}" stroke-width="2"/>`,
+      `<text x="${invInX - 6}" y="${outNodeY - 4}" text-anchor="end"
+        font-family="${FONT}" font-size="12" font-weight="700" fill="${C_OUT}">X</text>`,
+
+      // Inverter triangle
+      `<polygon points="${invInX},${outNodeY - triH/2} ${invInX},${outNodeY + triH/2} ${invInX + triW},${outNodeY}"
+        fill="none" stroke="${C_OUT}" stroke-width="2"/>`,
+      `<circle cx="${invInX + triW + bubbleR + 1}" cy="${outNodeY}" r="${bubbleR}"
+        fill="none" stroke="${C_OUT}" stroke-width="2"/>`,
+
+      // Y output
+      `<line x1="${invOutStartX-3}" y1="${outNodeY}" x2="${invOutStartX + yWireLen}" y2="${outNodeY}"
+        stroke="${C_OUT}" stroke-width="2"/>`,
+      `<text x="${invOutStartX + yWireLen + 6}" y="${outNodeY}" text-anchor="start" dominant-baseline="central"
+        font-family="${FONT}" font-size="12" font-weight="700" fill="${C_OUT}">Y</text>`
+    );
+  }
 
   // Output node down to actual NMOS top attach point
   parts.push(

@@ -87,25 +87,76 @@ function dualNetwork(net) {
   }
 }
 
+function unwrapTopLevelGroup(node) {
+  let cur = node;
+  while (cur && cur.type === 'GROUP') cur = cur.child;
+  return cur;
+}
+
+function makeNotAst(node) {
+  return { type: 'NOT', child: node };
+}
+
+function isTopLevelInverting(ast) {
+  const root = unwrapTopLevelGroup(ast);
+  return root && root.type === 'NOT';
+}
+
 function buildCmosNetworks(ast) {
   const warnings = [];
+  const root = unwrapTopLevelGroup(ast);
+  const vars = collectVars(ast);
 
-  if (ast.type !== 'NOT') {
-    throw new EngineError(
-      `Expression must start with NOT (~) for a single static CMOS gate.\n` +
-      `Got top-level: "${ast.type}".\n` +
-      `Hint: wrap your expression, e.g. ~(A & B)`
+  let coreExpr;
+  let displayExpr;
+  let internalExpr;
+  let needsOutputInverter = false;
+  let outputNodeName = 'Y';
+  let internalNodeName = null;
+
+  if (root.type === 'NOT') {
+    // Existing behavior: single inverting CMOS gate, final output is Y
+    coreExpr = root.child;
+    displayExpr = ast;
+    internalExpr = null;
+  } else {
+    // New behavior: non-inverting input becomes:
+    // X = ~(original expression)
+    // Y = ~X
+    coreExpr = ast;
+    displayExpr = ast;
+    internalExpr = makeNotAst(ast);
+    needsOutputInverter = true;
+    outputNodeName = 'Y';
+    internalNodeName = 'X';
+
+    warnings.push(
+      `Non-inverting top-level expression detected. Static CMOS implements this as an inverting complex gate producing X, followed by an output inverter producing Y.`
     );
   }
 
-  const inner = ast.child;
-  collectNestedNotWarnings(inner, warnings);
+  collectNestedNotWarnings(coreExpr, warnings);
 
-  const nmosNet = buildNmosNetwork(inner);
+  const nmosNet = buildNmosNetwork(coreExpr);
   const pmosNet = dualNetwork(nmosNet);
-  const vars    = collectVars(ast);
 
-  return { nmosNet, pmosNet, vars, warnings };
+  return {
+    nmosNet,
+    pmosNet,
+    vars,
+    warnings,
+    needsOutputInverter,
+    outputNodeName,
+    internalNodeName,
+    requestedAst: displayExpr,
+    internalAst: internalExpr,
+    coreAst: coreExpr,
+    gateType: classifyGate(nmosNet, vars),
+    coreTransistorCount: countTransistors(nmosNet),
+    totalTransistorCount: needsOutputInverter
+      ? (countTransistors(nmosNet) * 2) + 2
+      : (countTransistors(nmosNet) * 2)
+  };
 }
 
 // Detects inverted inputs (~A) inside the expression.

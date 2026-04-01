@@ -170,16 +170,20 @@ function evaluateAst(node, values) {
 //   ]
 // }
 const MAX_TRUTH_TABLE_VARS = 10;
-function generateTruthTableRows(ast) {
+function generateTruthTableRows(ast, options = {}) {
   const vars = collectVars(ast);
   const totalRows = Math.pow(2, vars.length);
+
+  const needsOutputInverter = options.needsOutputInverter === true;
+  const internalAst = options.internalAst || null;
 
   if (vars.length > MAX_TRUTH_TABLE_VARS) {
     return {
       vars,
       rows: null,
       tooLarge: true,
-      totalRows
+      totalRows,
+      needsOutputInverter
     };
   }
 
@@ -193,9 +197,27 @@ function generateTruthTableRows(ast) {
       inputs[vars[j]] = (i >> bitIndex) & 1;
     }
 
-    const output = evaluateAst(ast, inputs);
-    rows.push({ inputs, output });
+    if (needsOutputInverter) {
+      const internalX = evaluateAst(internalAst, inputs);
+      const finalY = evaluateAst(ast, inputs);
+
+      rows.push({
+        inputs,
+        internalX,
+        output: finalY
+      });
+    } else {
+      const output = evaluateAst(ast, inputs);
+      rows.push({
+        inputs,
+        output
+      });
+    }
   }
 
-  return { vars, rows };
+  return {
+    vars,
+    rows,
+    needsOutputInverter
+  };
 }

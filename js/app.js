@@ -25,6 +25,9 @@ const warnDiv      = document.getElementById('schematic-warnings');
 
 const bubbleWarnDiv = document.getElementById('bubble-warnings');
 const truthTableWrap = document.getElementById('truth-table-wrap');
+
+const parseNoteEl   = document.getElementById('parse-note');
+const implAlertEl   = document.getElementById('impl-alert');
 // ── Example chips ─────────────────────────────────────────────────────────────
 document.querySelectorAll('.chip').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -62,31 +65,63 @@ function run() {
   try { ast = parseExpression(raw); }
   catch (e) { showError('Parse error: ' + e.message); return; }
 
-  // Step 1b: Generate truth table data
+  // Step 2: Convert AST to CMOS implementation
+  let implementation;
+  try {
+    implementation = buildCmosNetworks(ast);
+  } catch (e) {
+    showError(e.message);
+    return;
+  }
+
+  const {
+    nmosNet,
+    pmosNet,
+    vars,
+    warnings,
+    needsOutputInverter,
+    internalAst,
+    requestedAst,
+    gateType,
+    coreTransistorCount,
+    totalTransistorCount
+  } = implementation;
+
+  // Step 3: Generate truth table data
   let truthTable;
   try {
-    truthTable = generateTruthTableRows(ast);
+    truthTable = generateTruthTableRows(ast, {
+      needsOutputInverter,
+      internalAst
+    });
   } catch (e) {
     showError('Truth table error: ' + e.message);
     return;
   }
 
-  // Step 2: Convert AST to CMOS pull-up / pull-down networks
-  let nmosNet, pmosNet, vars, warnings;
-  try { ({ nmosNet, pmosNet, vars, warnings } = buildCmosNetworks(ast)); }
-  catch (e) { showError(e.message); return; }
-
   // Step 3: Display normalized expression + metadata (parse result card)
-  normalizedEl.textContent = astToString(ast);
-  metaVars.textContent     = vars.join(', ');
-  const nCount = countTransistors(nmosNet);
-  metaCount.textContent    = `${nCount * 2} (${nCount}N + ${nCount}P)`;
-  metaGate.textContent     = classifyGate(nmosNet, vars);
+  normalizedEl.textContent = astToString(requestedAst);
+  metaVars.textContent = vars.join(', ');
+
+  if (needsOutputInverter) {
+    metaCount.textContent = `${totalTransistorCount} (${coreTransistorCount}N + ${coreTransistorCount}P + 1 inverter)`;
+    metaGate.textContent = `${gateType} + output inverter`;
+  } else {
+    metaCount.textContent = `${totalTransistorCount} (${coreTransistorCount}N + ${coreTransistorCount}P)`;
+    metaGate.textContent = gateType;
+  }
+
+  parseNoteEl.textContent = needsOutputInverter
+    ? 'This non-inverting Boolean expression is implemented in static CMOS as an inverting complex gate that produces X, followed by an output inverter that produces Y.'
+    : 'This expression maps directly to a single inverting static CMOS gate, so Y is produced in one stage.';
+
   show(sectionParse);
 
   // Step 4: Render bubble diagram (topology view)
   try {
-    bubbleDiv.innerHTML = renderBubbleDiagram(pmosNet, nmosNet);
+    bubbleDiv.innerHTML = renderBubbleDiagram(pmosNet, nmosNet, {
+      needsOutputInverter
+    });
   } catch (e) {
     bubbleDiv.innerHTML = errMsg('Bubble diagram error: ' + e.message);
     console.error(e);
@@ -94,7 +129,9 @@ function run() {
 
   // Step 5: Render transistor schematic
   try {
-    schDiv.innerHTML = renderSchematic(pmosNet, nmosNet);
+    schDiv.innerHTML = renderSchematic(pmosNet, nmosNet, {
+      needsOutputInverter
+    });
   } catch (e) {
     schDiv.innerHTML = errMsg('Schematic error: ' + e.message);
     console.error(e);
@@ -124,6 +161,21 @@ function run() {
     warnDiv.appendChild(schematicItem);
   });
 
+  if (needsOutputInverter) {
+    implAlertEl.innerHTML = `
+      <div class="impl-alert-box">
+        <div class="impl-alert-title">Two-stage static CMOS implementation</div>
+        <div class="impl-alert-line">Requested logic: Y = ${escapeHtml(astToString(requestedAst))}</div>
+        <div class="impl-alert-line">Internal CMOS gate output: X = ${escapeHtml(astToString(internalAst))}</div>
+        <div class="impl-alert-line">Final output: Y = ~X</div>
+      </div>
+    `;
+    implAlertEl.classList.remove('hidden');
+  } else {
+    implAlertEl.innerHTML = '';
+    implAlertEl.classList.add('hidden');
+  }  
+
   show(outputArea);
   if (window.innerWidth < 900) {
     setTimeout(() => outputArea.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
@@ -143,6 +195,12 @@ function show(el) { el.classList.remove('hidden'); }
 function hide(el) { el.classList.add('hidden'); }
 function errMsg(msg) {
   return `<span style="color:#dc2626;font-family:IBM Plex Mono,monospace;font-size:12px;padding:16px;display:block">${msg}</span>`;
+}
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
 }
 function renderTruthTable(truthTable) {
   if (!truthTable || !truthTable.vars) {
@@ -164,14 +222,17 @@ function renderTruthTable(truthTable) {
 
   const vars = truthTable.vars;
   const rows = truthTable.rows;
+  const showInternalX = truthTable.needsOutputInverter === true;
 
   const headerHtml =
     vars.map(v => `<th>${v}</th>`).join('') +
+    (showInternalX ? `<th class="output-cell">X (internal)</th>` : '') +
     `<th class="output-cell">Y (output)</th>`;
 
   const rowsHtml = rows.map(row => {
     const inputCells = vars.map(v => `<td>${row.inputs[v]}</td>`).join('');
-    return `<tr>${inputCells}<td class="output-cell">${row.output}</td></tr>`;
+    const xCell = showInternalX ? `<td class="output-cell">${row.internalX}</td>` : '';
+    return `<tr>${inputCells}${xCell}<td class="output-cell">${row.output}</td></tr>`;
   }).join('');
 
   return `

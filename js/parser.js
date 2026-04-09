@@ -78,6 +78,112 @@ function parseExpression(src) {
   return new Parser(src.trim()).parse();
 }
 
+// Creates a deep copy of an AST so layout normalization never mutates
+// the original parsed expression used for logic evaluation.
+function cloneAst(node) {
+  if (!node) return node;
+
+  switch (node.type) {
+    case 'VAR':
+      return { type: 'VAR', name: node.name };
+
+    case 'NOT':
+      return { type: 'NOT', child: cloneAst(node.child) };
+
+    case 'GROUP':
+      return { type: 'GROUP', child: cloneAst(node.child) };
+
+    case 'AND':
+    case 'OR':
+      return {
+        type: node.type,
+        children: node.children.map(cloneAst)
+      };
+
+    default:
+      throw new Error(`Unknown AST node type in cloneAst: ${node.type}`);
+  }
+}
+
+// Layout-safe normalization pass.
+// Purpose:
+// - preserve logic exactly
+// - add explicit GROUP wrappers around mixed-operator children
+// - do NOT rebalance flat same-operator chains
+//
+// Examples:
+//   A&B|D|E&C        -> (A&B) | D | (E&C)
+//   A&(B|C)|C&D&E    -> (A&(B|C)) | (C&D&E)
+//   A&B&C&D          -> stays flat AND
+//   A|B|C|D|E        -> stays flat OR
+//
+// Important:
+// This is for display / rendering readability only.
+// It must not change Boolean meaning.
+function normalizeAstForLayout(node) {
+  if (!node) return node;
+
+  switch (node.type) {
+    case 'VAR':
+      return cloneAst(node);
+
+    case 'NOT':
+      return {
+        type: 'NOT',
+        child: normalizeAstForLayout(node.child)
+      };
+
+    case 'GROUP':
+      return {
+        type: 'GROUP',
+        child: normalizeAstForLayout(node.child)
+      };
+
+    case 'AND': {
+      const children = node.children.map(child => normalizeAstForLayout(child));
+
+      return {
+        type: 'AND',
+        children: children.map(child => {
+          const inner = child.type === 'GROUP' ? child.child : child;
+
+          // Inside an AND, explicitly group OR children for readability.
+          if (inner.type === 'OR') {
+            return child.type === 'GROUP'
+              ? child
+              : { type: 'GROUP', child };
+          }
+
+          return child;
+        })
+      };
+    }
+
+    case 'OR': {
+      const children = node.children.map(child => normalizeAstForLayout(child));
+
+      return {
+        type: 'OR',
+        children: children.map(child => {
+          const inner = child.type === 'GROUP' ? child.child : child;
+
+          // Inside an OR, explicitly group AND children for readability.
+          if (inner.type === 'AND') {
+            return child.type === 'GROUP'
+              ? child
+              : { type: 'GROUP', child };
+          }
+
+          return child;
+        })
+      };
+    }
+
+    default:
+      throw new Error(`Unknown AST node type in normalizeAstForLayout: ${node.type}`);
+  }
+}
+
 // Converts AST back into a normalized, readable Boolean expression
 function astToString(node, parentPrec = 0) {
   switch (node.type) {

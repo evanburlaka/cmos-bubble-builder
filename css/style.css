@@ -217,6 +217,18 @@ body {
   margin-bottom: 14px;
   word-break: break-all;
 }
+.parse-subnote {
+  margin: -4px 0 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.parse-subnote strong {
+  font-family: var(--font-mono);
+  color: var(--text);
+  font-weight: 600;
+}
 .parse-meta {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

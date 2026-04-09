@@ -16,6 +16,7 @@ const errorBox     = document.getElementById('error-box');
 const sectionParse = document.getElementById('section-parse');
 const outputArea   = document.getElementById('output-area');
 const normalizedEl = document.getElementById('normalized-expr');
+const parsedAsNote = document.getElementById('parsed-as-note');
 const metaVars     = document.getElementById('meta-vars');
 const metaCount    = document.getElementById('meta-count');
 const metaGate     = document.getElementById('meta-gate');
@@ -50,6 +51,20 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+function shouldShowMixedOperatorWarning(raw, originalAst) {
+  const compact = raw.replace(/\s+/g, '');
+
+  // Must contain both operators.
+  if (!compact.includes('&') || !compact.includes('|')) return false;
+
+  // If the user used any explicit grouping, do not warn.
+  if (compact.includes('(') || compact.includes(')')) return false;
+
+  // Only warn when the actual parsed top-level structure is mixed.
+  // Pure flat chains like A&B&C or A|B|C should never warn.
+  return originalAst.type === 'AND' || originalAst.type === 'OR';
+}
+
 // ── Main execution pipeline (input → parse → CMOS → render) ───────────────────
 // Executes full pipeline from user input to rendered output
 function run() {
@@ -58,17 +73,34 @@ function run() {
   hide(sectionParse);
   hide(outputArea);
 
+  parsedAsNote.innerHTML = '';
+  parsedAsNote.classList.add('hidden');
+
   if (!raw) { showError('Please enter a Boolean expression.'); return; }
 
-  // Step 1: Parse Boolean expression into AST
-  let ast;
-  try { ast = parseExpression(raw); }
-  catch (e) { showError('Parse error: ' + e.message); return; }
+  // Step 1: Parse Boolean expression into original AST (source of truth)
+  let originalAst;
+  try {
+    originalAst = parseExpression(raw);
+  } catch (e) {
+    showError('Parse error: ' + e.message);
+    return;
+  }
 
-  // Step 2: Convert AST to CMOS implementation
+  // Step 2: Build a layout/display AST that adds explicit grouping
+  // for mixed-operator readability, without changing logic.
+  let layoutAst;
+  try {
+    layoutAst = normalizeAstForLayout(originalAst);
+  } catch (e) {
+    showError('Layout normalization error: ' + e.message);
+    return;
+  }
+
+  // Step 3: Convert layout AST to CMOS implementation
   let implementation;
   try {
-    implementation = buildCmosNetworks(ast);
+    implementation = buildCmosNetworks(layoutAst);
   } catch (e) {
     showError(e.message);
     return;
@@ -81,26 +113,43 @@ function run() {
     warnings,
     needsOutputInverter,
     internalAst,
-    requestedAst,
     gateType,
     coreTransistorCount,
     totalTransistorCount
   } = implementation;
 
-  // Step 3: Generate truth table data
+  // Step 4: Generate truth table data from the ORIGINAL AST
+  // so logic verification is always tied to the real parsed meaning.
   let truthTable;
   try {
-    truthTable = generateTruthTableRows(ast, {
+    truthTable = generateTruthTableRows(originalAst, {
       needsOutputInverter,
-      internalAst
+      internalAst: needsOutputInverter
+        ? { type: 'NOT', child: cloneAst(originalAst) }
+        : null
     });
   } catch (e) {
     showError('Truth table error: ' + e.message);
     return;
   }
 
-  // Step 3: Display normalized expression + metadata (parse result card)
-  normalizedEl.textContent = astToString(requestedAst);
+  // Compare normalized display string vs original normalized parse string
+  const originalExprText = astToString(originalAst);
+  const layoutExprText = astToString(layoutAst);
+  const layoutAdjusted = originalExprText !== layoutExprText;
+  const showMixedWarning = shouldShowMixedOperatorWarning(raw, originalAst);
+
+  // Step 5: Display normalized expression + metadata
+  normalizedEl.textContent = layoutExprText;
+
+  if (showMixedWarning) {
+    parsedAsNote.textContent = `⚠ Mixed AND/OR without parentheses. Interpreted as: ${layoutExprText}`;
+    parsedAsNote.classList.remove('hidden');
+  } else if (layoutAdjusted) {
+    parsedAsNote.textContent = 'Grouped by operator precedence for readability.';
+    parsedAsNote.classList.remove('hidden');
+  }
+
   metaVars.textContent = vars.join(', ');
 
   if (needsOutputInverter) {
@@ -111,13 +160,19 @@ function run() {
     metaGate.textContent = gateType;
   }
 
-  parseNoteEl.textContent = needsOutputInverter
-    ? 'This non-inverting Boolean expression is implemented in static CMOS as an inverting complex gate that produces X, followed by an output inverter that produces Y.'
-    : 'This expression maps directly to a single inverting static CMOS gate, so Y is produced in one stage.';
+  if (needsOutputInverter) {
+    parseNoteEl.textContent = layoutAdjusted
+      ? 'This expression was grouped for readability without changing its logic. Because the top-level function is non-inverting, it is implemented in static CMOS as an inverting complex gate that produces X, followed by an output inverter that produces Y.'
+      : 'This non-inverting Boolean expression is implemented in static CMOS as an inverting complex gate that produces X, followed by an output inverter that produces Y.';
+  } else {
+    parseNoteEl.textContent = layoutAdjusted
+      ? 'This expression was grouped for readability without changing its logic. It still maps directly to a single inverting static CMOS gate, so Y is produced in one stage.'
+      : 'This expression maps directly to a single inverting static CMOS gate, so Y is produced in one stage.';
+  }
 
   show(sectionParse);
 
-  // Step 4: Render bubble diagram (topology view)
+  // Step 6: Render bubble diagram using layout AST-derived networks
   try {
     bubbleDiv.innerHTML = renderBubbleDiagram(pmosNet, nmosNet, {
       needsOutputInverter
@@ -127,7 +182,7 @@ function run() {
     console.error(e);
   }
 
-  // Step 5: Render transistor schematic
+  // Step 7: Render transistor schematic
   try {
     schDiv.innerHTML = renderSchematic(pmosNet, nmosNet, {
       needsOutputInverter
@@ -137,7 +192,7 @@ function run() {
     console.error(e);
   }
 
-  // Step 5b: Render truth table
+  // Step 8: Render truth table
   try {
     truthTableWrap.innerHTML = renderTruthTable(truthTable);
   } catch (e) {
@@ -145,7 +200,7 @@ function run() {
     console.error(e);
   }
 
-  // Step 6: Display warnings (e.g., inverted inputs
+  // Step 9: Display warnings
   bubbleWarnDiv.innerHTML = '';
   warnDiv.innerHTML = '';
 
@@ -162,11 +217,13 @@ function run() {
   });
 
   if (needsOutputInverter) {
+    const internalDisplayAst = { type: 'NOT', child: cloneAst(layoutAst) };
+
     implAlertEl.innerHTML = `
       <div class="impl-alert-box">
         <div class="impl-alert-title">Two-stage static CMOS implementation</div>
-        <div class="impl-alert-line">Requested logic: Y = ${escapeHtml(astToString(requestedAst))}</div>
-        <div class="impl-alert-line">Internal CMOS gate output: X = ${escapeHtml(astToString(internalAst))}</div>
+        <div class="impl-alert-line">Requested logic: Y = ${escapeHtml(astToString(layoutAst))}</div>
+        <div class="impl-alert-line">Internal CMOS gate output: X = ${escapeHtml(astToString(internalDisplayAst))}</div>
         <div class="impl-alert-line">Final output: Y = ~X</div>
       </div>
     `;
@@ -174,7 +231,7 @@ function run() {
   } else {
     implAlertEl.innerHTML = '';
     implAlertEl.classList.add('hidden');
-  }  
+  }
 
   show(outputArea);
   if (window.innerWidth < 900) {
